@@ -18,15 +18,12 @@
  **********
  * andrew.diver@yahoo.co.uk    02/06/2015
  *
- * Modified code to allow 2 '0' bytes to be followed by a 4byte
- * little-endian integer to allow long 'GAP' spaces to be sent
- * without overflowing.
- * The udp driver (almost) supports this as 'extended time' format
+ * Modified avrlirc2udp  code to allow the 15bit length value of 0 to be followed by a 4byte
+ * little-endian integer to allow long 'GAP' spaces to be sent without overflowing.
+ * The udp driver supports this 'extended time' format
  * - see lirc/plugins/udp.c  udp_readdata()
- * It was necessary to patch udp.c in order to allow the MSbit
- * flag to be used to indicate 'space' in a similar way to how it
- * works for the 2byte word format.
- * This allowed it to be run using 1us drv.resolution thus:
+ *
+ * Run lircd  using 1us drv.resolution thus:
  * lircd --driver=udp --driver-option=clocktick:1
  *
  * lirc version 0.9.2 or higher is required to use the --driver-option=clocktick:N option
@@ -286,15 +283,15 @@ data_loop(int from, int tcp, char *host, int port)
             /*  normal case: 15bit len  */
             len_raw = (b[1] << 8) | b[0];
         } else {
-            /*  Special case for sending 24bit len values:
-             *  0 indicates 'extended time' format: 4 byte little-endian integer eg for long gap values 
-             *  -  read 3 more bytes for int value.
+            /*  Special case for sending >15bit len values:
+             *  15bits of 0 indicates 'extended time' format: 4 byte little-endian integer eg for long gap values 
+             *  -  read 4 more bytes for length value.
              */
             for (n = 2; n < 6; n++) {
                 if (read(from, b + n, 1) <= 0)
                     die("read");
             }
-            /*  lirc will truncate to 24b  - PULSE_MASK   */
+            /*  lircd will actually truncate to 24b  - see PULSE_MASK  - but that's plenty  */
             len_raw = (b[5] << 24) | (b[4] << 16) | (b[3] << 8) | b[2];
             len = len_raw & 0xffffff;
         }
@@ -318,13 +315,13 @@ data_loop(int from, int tcp, char *host, int port)
                 to = socket_init(tcp, host, port);
             if (to >= 0) {
                 if (n == 2) {
-                    /*  normal case: send short  */
+                    /*  normal case: send 2bytes - 15bit length & is_space flag MSB  */
                     if (write(to, b, 2) < 0) {
                         if (errno != ECONNREFUSED)
                                 die("write");
                     }
                 } else if (n == 6) {
-                    /*  extended 4byte case - eg gap overflow: send int  */
+                    /*  extended 2+4byte case - eg gap overflow: send int  */
                     if (write(to, b, 6) < 0) {
                         if (errno != ECONNREFUSED)
                                 die("write");

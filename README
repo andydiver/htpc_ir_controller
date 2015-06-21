@@ -17,16 +17,14 @@ and turn it on (if it's off) by sending the IR code for the Samsung POWER key by
 transmitter LED.
 
 3.  Send the IR codes to lircd running on the HTPC via the USART header on the motherboard.
-This is done as per the 'avrlirc' project: having a daemon read the USART serial line and 
-re-broadcast the data via UDP for the lircd udp driver.
+This is done as per the 'avrlirc' project by Paul Fox: having a daemon read the USART serial line and 
+re-broadcast the data via UDP for the lircd udp driver. A slightly modified version of his 
+avrlirc2udp  serial -> lirc daemon is used here. It was modified to allow longer (>15bit) pulse/space legths to be
+sent via serial -> lirc.
+See  https://github.com/foxharp/avrlirc 
 
 4.  On shutdown of the HTPC, automatically power off the Samsung TV by sending the Samsung POWER IR code.
 
-Detection of the TV power state was achieved by building a circuit that transmits an IR pulse
-every 5s that is powered by the TVs USB port giving an IR heartbeat when the TV is on.
-A detector on the HTPC detects this and outputs a logic1 or 0 level to an input GPIO line
-on the ATmega328.
- 
 The main IR detector outputs the scancodes to USART serial line re-encoded as pulse/space lengths in a format
 that the lirc udp driver can read (lengths as 16-bit low-endian shorts). The MSbit flag is used
 to mark spaces. The USART connection uses 38kbaud 8N1.
@@ -35,18 +33,31 @@ This is designed for an ATmega328P. It uses the 16bit TIMER1 to measure interval
 Connect the IR detector eg Vishay TSOP4838 or similar  to ICP1 pin. The IR detector should be inverting ie
 Vdetector = 3V3 (high) when no button pressed. It should go low when an IR pulse is received.
 
-8bit TIMER2 is used to control timing to send IR signals to an IR LED transmitter - designed
+8bit TIMER2 is used to control timing to send IR signals (IR blasting) to an IR LED transmitter - designed
 to send Samsung TV remote signals eg to turn the TV/monitor on when the HTPC is booted.
-GPIO inputs detect the TV on/off state and also the PC PWR on/off state.
+
+8bit TIMER0 is used to control timing to red LED to give visual feedback - rapidly flickering when
+IR pulses are detected. In 'TV mode', the LED is on to show that the TV is the target of IR codes.
+Since the TV key on the MCE remote is used to toggle the mode, it is useful to have a reminder of
+the current state!
+
 A GPIO output is used to turn the PC on/off by sending a +ve pulse to an NPN transistor to
-switch the PWR switch pin on the PC motherboard to ground.
+switch the PWR switch pin on the PC motherboard to ground for a few hundred ms.
+
 A GPIO output is used to send pulses to the IR transmitter LED via an NPN transistor amp
 to IR blast the Samsung TV/monitor. The LED is the collector load from 3V3 and a 10R resistor
 used from emitter to GND.
 
+A GPIO inputs detect the TV on/off state and also the PC PWR on/off state.
+Detection of the TV power state was achieved by building a circuit that transmits an IR pulse
+every 5s that is powered by the TVs USB port giving an IR heartbeat when the TV is on.
+A detector on the HTPC detects this and outputs a logic1 or 0 level to an input GPIO line
+on the ATmega328.
+ 
 See ir_controller.c  for pin diagram.
 
-Tested with 16MHz crystal clock for ATmega328P.
+Tested with 16MHz crystal clock for ATmega328P - works with 38400baud, not v. reliable at 57600.
+Tested with 8MHz internal RC oscillator - works if baudrate dropped to 19200.
 May also work with F_CPU at 8MHz using the internal RC oscillator (NB untested as yet!)
 
 A daemon avrlirc2upd.c  has to be run on the lircd host to read from the serial port and output

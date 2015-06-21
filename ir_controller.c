@@ -359,7 +359,8 @@ uint8_t main(void) {
 
     blink(2);                //  just to show some reset activity
 
-    usart_init(38400);       //  Baudrate has to match avrlirc2upd daemon on PC client. 
+    //usart_init(19200);       //  Works with 8MHz RC oscillator: 38400 doesn't.
+    usart_init(38400);       //  Works with xtal F_CPU=16MHz, baudrate has to match avrlirc2upd daemon on PC client. 
 
     hw_init();               //  Set up interrupts & TIMER registers etc
 

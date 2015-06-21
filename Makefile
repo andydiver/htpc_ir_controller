@@ -1,10 +1,7 @@
-#  eg   make MCU=atmega328p AVRDUDEMCU=m328p install  
-
 MCU?=atmega328p
 AVRDUDEMCU?=m328p
 
 CC=/usr/bin/avr-gcc
-#  http://stackoverflow.com/questions/2129391/append-to-gnu-make-variables-via-command-line
 CFLAGS=-Os -Wall -std=c99 -mcall-prologues -mmcu=$(MCU) -DF_CPU=16000000 
 ##CFLAGS=-Os -Wall -std=c99 -mcall-prologues -mmcu=$(MCU) -DF_CPU=8000000 
 
@@ -13,9 +10,6 @@ AVRDUDE=/usr/local/bin/avrdude
 TARGET=ir_controller
 SRCS=$(TARGET).c      
 OBJECTS=$(TARGET).o  
-
-#i2c_lib.o: i2c_lib.c i2c_lib.h
-#	$(CC) $(CFLAGS) -c $< -o $@
 
 $(TARGET).o: $(TARGET).c $(TARGET).h
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -40,9 +34,7 @@ noreset : all
 fuse :
 	sudo gpio -g mode 22 out
 	sudo gpio -g write 22 0
-#  ATmega328
 	sudo $(AVRDUDE) -p $(AVRDUDEMCU) -P /dev/spidev0.0 -c linuxspi -b 10000 -U lfuse:w:0xef:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m  # xtal  SUT=1,0
-#	sudo $(AVRDUDE) -p $(AVRDUDEMCU) -P /dev/spidev0.0 -c linuxspi -b 10000 -U lfuse:w:0x62:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m  # dflt: RC 1MHz
 ##	sudo $(AVRDUDE) -p $(AVRDUDEMCU) -P /dev/spidev0.0 -c linuxspi -b 10000 -U lfuse:w:0xe2:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m  #       RC 8MHz
 	sudo gpio -g write 22 1
 
