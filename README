@@ -1,12 +1,35 @@
-ir_controller.c
 
 andrew.diver@yahoo.co.uk
-02/06/2015
+21/06/2015
 
-Extends ir_decoder.c code which is used to decode incoming IR pulses in NEC/Samsung/RC6 encoding.
-It outputs the scancodes to USART serial line re-encoded as pulse/space lengths in a format
+IR decoder which can decode incoming IR pulses in NEC/Samsung/RC6 encoding. This application
+is specific to using a Microsoft Media Center Edition remote (RC6 protocol).
+The project is specific to my home HTPC setup where I use an MCE remote to control kodi.
+
+I wanted to be able to
+
+1.  Have the PC startup by pressing the MCE POWER key.  (Requires using the ATX psu's standby power
+line for the ATmega328P). This is done using an NPN transistor to switch a pin on the motherboard to ground
+for a few hundred ms (which is how the manual power button works).
+
+2.  On startup, detect the On/Off state of the monitor - which is actually an HD'ready Samsung TV
+and turn it on (if it's off) by sending the IR code for the Samsung POWER key by modulating an IR
+transmitter LED.
+
+3.  Send the IR codes to lircd running on the HTPC via the USART header on the motherboard.
+This is done as per the 'avrlirc' project: having a daemon read the USART serial line and 
+re-broadcast the data via UDP for the lircd udp driver.
+
+4.  On shutdown of the HTPC, automatically power off the Samsung TV by sending the Samsung POWER IR code.
+
+Detection of the TV power state was achieved by building a circuit that transmits an IR pulse
+every 5s that is powered by the TVs USB port giving an IR heartbeat when the TV is on.
+A detector on the HTPC detects this and outputs a logic1 or 0 level to an input GPIO line
+on the ATmega328.
+ 
+The main IR detector outputs the scancodes to USART serial line re-encoded as pulse/space lengths in a format
 that the lirc udp driver can read (lengths as 16-bit low-endian shorts). The MSbit flag is used
-to mark spaces. The USART connection uses 38kbaud 8N1. Could be made faster if required. 
+to mark spaces. The USART connection uses 38kbaud 8N1.
 
 This is designed for an ATmega328P. It uses the 16bit TIMER1 to measure intervals using Input Capture.
 Connect the IR detector eg Vishay TSOP4838 or similar  to ICP1 pin. The IR detector should be inverting ie
@@ -23,15 +46,14 @@ used from emitter to GND.
 
 See ir_controller.c  for pin diagram.
 
-Tested with 16MHz crystal. Should also work with F_CPU at 8MHz using the internal RC oscillator
+Tested with 16MHz crystal clock for ATmega328P.
+May also work with F_CPU at 8MHz using the internal RC oscillator (NB untested as yet!)
 
 A daemon avrlirc2upd.c  has to be run on the lircd host to read from the serial port and output
 the data as UDP packets. 
 I have modified avrlirc2udp.c  to support the lirc 'extended time' format where a length of
 0x0000 (short) followed by a 4-byte little-endian int can be used to send longer time intervals
 which allows a resolution of 1us to be used for the lirc udp timings.
-I also had to patch  lirc/plugins/udp.c  to handle the MSbit flag to indicate space in the case of
-4byte time intervals.
 
 #  To build the AVR code and flash it:
 make all
