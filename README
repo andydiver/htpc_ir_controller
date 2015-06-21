@@ -1,0 +1,56 @@
+ir_controller.c
+
+andrew.diver@yahoo.co.uk
+02/06/2015
+
+Extends ir_decoder.c code which is used to decode incoming IR pulses in NEC/Samsung/RC6 encoding.
+It outputs the scancodes to USART serial line re-encoded as pulse/space lengths in a format
+that the lirc udp driver can read (lengths as 16-bit low-endian shorts). The MSbit flag is used
+to mark spaces. The USART connection uses 38kbaud 8N1. Could be made faster if required. 
+
+This is designed for an ATmega328P. It uses the 16bit TIMER1 to measure intervals using Input Capture.
+Connect the IR detector eg Vishay TSOP4838 or similar  to ICP1 pin. The IR detector should be inverting ie
+Vdetector = 3V3 (high) when no button pressed. It should go low when an IR pulse is received.
+
+8bit TIMER2 is used to control timing to send IR signals to an IR LED transmitter - designed
+to send Samsung TV remote signals eg to turn the TV/monitor on when the HTPC is booted.
+GPIO inputs detect the TV on/off state and also the PC PWR on/off state.
+A GPIO output is used to turn the PC on/off by sending a +ve pulse to an NPN transistor to
+switch the PWR switch pin on the PC motherboard to ground.
+A GPIO output is used to send pulses to the IR transmitter LED via an NPN transistor amp
+to IR blast the Samsung TV/monitor. The LED is the collector load from 3V3 and a 10R resistor
+used from emitter to GND.
+
+See ir_controller.c  for pin diagram.
+
+Tested with 16MHz crystal. Should also work with F_CPU at 8MHz using the internal RC oscillator
+
+A daemon avrlirc2upd.c  has to be run on the lircd host to read from the serial port and output
+the data as UDP packets. 
+I have modified avrlirc2udp.c  to support the lirc 'extended time' format where a length of
+0x0000 (short) followed by a 4-byte little-endian int can be used to send longer time intervals
+which allows a resolution of 1us to be used for the lirc udp timings.
+I also had to patch  lirc/plugins/udp.c  to handle the MSbit flag to indicate space in the case of
+4byte time intervals.
+
+#  To build the AVR code and flash it:
+make all
+make install
+
+#  To compile avrlirc2udp
+gcc -O2 avrlirc2udp.c -o avrlirc2udp
+
+
+#  NB  lircd  interprets the bits the opposite way round from my decoding so
+#  it will give the 2s complement.
+#  eg  ir_controller  reads  KEY_OK as scan=0x800f8422
+#  whereas lircd using udp:  KEY_OK    scan=0x0ff07bdd
+#  Maybe this is a result of the inverting nature of the IR detector(?) 
+#  
+Working RC6 capture from MCE remote:  RC6 scan=0x800f8422  (KEY_OK)
+2696 868 448 456 416 424 448 872 444 860 1336 
+904 412 432 448 432 448 432 448 432 448 432 444 428 448 464 412 
+432 448 464 416 432 892 428 448 456 416 424 448 424 448 872 444 
+428 444 464 412 428 892 872 448 432 448 432 448 432 892 908 412 
+436 444 428 888 872 448 452100 2692 ...
+#  intervals are in 1us units.
