@@ -1,35 +1,47 @@
 
 andrew.diver@yahoo.co.uk
-21/06/2015
+22/06/2015
 
-IR decoder which can decode incoming IR pulses in NEC/Samsung/RC6 encoding. This application
-is specific to using a Microsoft Media Center Edition remote (RC6 protocol).
-The project is specific to my home HTPC setup where I use an MCE remote to control kodi.
+A microcontroller project to handle infrared detection and control of a Samsung TV (used as
+a monitor) for an HTPC. Based on the ir_dedecoder project which can decode incoming IR pulses in NEC/Samsung/RC6 encoding.
+The app is specific to using a Microsoft Media Center Edition remote (RC6 protocol) and targets a Samsung TV as monitor.
+The project is specific to my home HTPC setup where I use a Microsoft Media Center IR remote to control lirc (and hence kodi).
 
-I wanted to be able to
+I wanted to be able to:
 
-1.  Have the PC startup by pressing the MCE POWER key.  (Requires using the ATX psu's standby power
+1.  Have the PC startup by pressing the MCE remote's POWER key.  (Requires using the ATX psu's standby power
 line for the ATmega328P). This is done using an NPN transistor to switch a pin on the motherboard to ground
 for a few hundred ms (which is how the manual power button works).
 
-2.  On startup, detect the On/Off state of the monitor - which is actually an HD'ready Samsung TV
+2.  On startup, detect the On/Off state of the monitor - which is actually an 'HD-ready' Samsung TV
 and turn it on (if it's off) by sending the IR code for the Samsung POWER key by modulating an IR
 transmitter LED.
 
 3.  Send the IR codes to lircd running on the HTPC via the USART header on the motherboard.
-This is done as per the 'avrlirc' project by Paul Fox: having a daemon read the USART serial line and 
+This is done as per Paul Fox's avrlirc project: 
+    https://github.com/foxharp/avrlirc
+which has a daemon read the USART serial line and 
 re-broadcast the data via UDP for the lircd udp driver. A slightly modified version of his 
-avrlirc2udp  serial -> lirc daemon is used here. It was modified to allow longer (>15bit) pulse/space legths to be
-sent via serial -> lirc.
-See  https://github.com/foxharp/avrlirc 
+avrlirc2udp  serial -> lirc daemon is used here. It was modified to allow longer (>15bit) pulse/space 
+lengths to be sent via serial -> lirc.
 
-4.  On shutdown of the HTPC, automatically power off the Samsung TV by sending the Samsung POWER IR code.
+4.  On shutdown of the HTPC, automatically power off the Samsung TV by sending the NEC/Samsung IR POWER code.
 
-The main IR detector outputs the scancodes to USART serial line re-encoded as pulse/space lengths in a format
-that the lirc udp driver can read (lengths as 16-bit low-endian shorts). The MSbit flag is used
-to mark spaces. The USART connection uses 38kbaud 8N1.
+5.  Have a 'tv mode' by pressing the LIVETV button on the MCE remote which will then allow further MCE 
+remote button presses to be translated and re-transmitted by the IR LED to the Samsung TV/monitor.
+This would be used occasionally for adjustment of the TV settings )master volume, contrast etc) without needing
+to dig out the TV's remote control.
+This also allows the TV to be switched off leaving the HTPC on. In 'tv mode', the MCE scancodes are not sent
+via serial and so will only be interpreted by the TV. Only a chosen subset of the Samsung's remote
+buttons were implemented, as I will never use the TV functionality. Pressing LIVETV again will toggle 
+the mode back to lirc.
 
-This is designed for an ATmega328P. It uses the 16bit TIMER1 to measure intervals using Input Capture.
+The microcontroller IR detector outputs the scancodes to USART serial line re-encoded as pulse/space 
+lengths in a format that the lirc udp driver can read (lengths as 16-bit low-endian shorts).
+The MSbit flag is used to mark spaces. The USART connection uses 19.2 kbaud or 38.4kbaud 8N1.
+
+This is designed for an ATmega328P. It uses the 16bit TIMER1 to measure the IR pulse/space intervals using 
+Input Capture interrupts.
 Connect the IR detector eg Vishay TSOP4838 or similar  to ICP1 pin. The IR detector should be inverting ie
 Vdetector = 3V3 (high) when no button pressed. It should go low when an IR pulse is received.
 
@@ -48,11 +60,12 @@ A GPIO output is used to send pulses to the IR transmitter LED via an NPN transi
 to IR blast the Samsung TV/monitor. The LED is the collector load from 3V3 and a 10R resistor
 used from emitter to GND.
 
-A GPIO inputs detect the TV on/off state and also the PC PWR on/off state.
+GPIO inputs detect the TV on/off state and also the PC POWER on/off state.
 Detection of the TV power state was achieved by building a circuit that transmits an IR pulse
-every 5s that is powered by the TVs USB port giving an IR heartbeat when the TV is on.
-A detector on the HTPC detects this and outputs a logic1 or 0 level to an input GPIO line
-on the ATmega328.
+every 5s that is powered by the TV's USB port giving an IR heartbeat when the TV is on.
+An IR detector on the HTPC detects this and outputs a logic1 or 0 level to an input GPIO line
+on the ATmega328. The modulation for the TV's IR heartbeat was set at 10kHz to try to avoid
+interfering with the 38kHz modulation frequency used by the MCE remote and the Samsung remote.
  
 See ir_controller.c  for pin diagram.
 
@@ -60,7 +73,7 @@ Tested with 16MHz crystal clock for ATmega328P - works with 38400baud, not v. re
 Tested with 8MHz internal RC oscillator - works if baudrate dropped to 19200.
 May also work with F_CPU at 8MHz using the internal RC oscillator (NB untested as yet!)
 
-A daemon avrlirc2upd.c  has to be run on the lircd host to read from the serial port and output
+The  avrlirc2upd  daemon has to be run on the lircd host to read from the serial port and output
 the data as UDP packets. 
 I have modified avrlirc2udp.c  to support the lirc 'extended time' format where a length of
 0x0000 (short) followed by a 4-byte little-endian int can be used to send longer time intervals
@@ -72,6 +85,12 @@ make install
 
 #  To compile avrlirc2udp
 gcc -O2 avrlirc2udp.c -o avrlirc2udp
+
+To run:
+/usr/local/bin/avrlirc2udp -t /dev/ttyS0 -h localhost -p 9012
+
+To run lircd:
+/usr/sbin/lircd -H udp -d 9012 --driver-option=clocktick:1
 
 
 #  NB  lircd  interprets the bits the opposite way round from my decoding so
