@@ -2,10 +2,12 @@
 andrew.diver@yahoo.co.uk
 22/06/2015
 
-A microcontroller project to handle infrared detection and control of a Samsung TV (used as
+An ATmega328P microcontroller project to handle infrared detection and control of a Samsung TV (used as
 a monitor) for an HTPC. Based on the ir_dedecoder project which can decode incoming IR pulses in NEC/Samsung/RC6 encoding.
 The app is specific to using a Microsoft Media Center Edition remote (RC6 protocol) and targets a Samsung TV as monitor.
 The project is specific to my home HTPC setup where I use a Microsoft Media Center IR remote to control lirc (and hence kodi).
+
+See ir_controller.c  for ATmega328P pin diagram.
 
 I wanted to be able to:
 
@@ -60,15 +62,18 @@ A GPIO output is used to send pulses to the IR transmitter LED via an NPN transi
 to IR blast the Samsung TV/monitor. The LED is the collector load from 3V3 and a 10R resistor
 used from emitter to GND.
 
-GPIO inputs detect the TV on/off state and also the PC POWER on/off state.
-Detection of the TV power state was achieved by building a circuit that transmits an IR pulse
-every 5s that is powered by the TV's USB port giving an IR heartbeat when the TV is on.
-An IR detector on the HTPC detects this and outputs a logic1 or 0 level to an input GPIO line
-on the ATmega328. The modulation for the TV's IR heartbeat was set at 10kHz to try to avoid
-interfering with the 38kHz modulation frequency used by the MCE remote and the Samsung remote.
- 
-See ir_controller.c  for pin diagram.
+A GPIO input detects the PC POWER on/off state by simply reading the voltage on the ATX psu's
+3V3 line - which is 0 when PC is off.
 
+A GPIO input detects the TV on/off state by receiving an IR signal from a custom USB-powered circuit
+plugged in to the Samsung TV  - see doc/irhb_10kHz.pdf
+This circuit transmits an IR pulse approximately every 5s providing an IR heartbeat when the TV is on.
+An IR detector on the HTPC detects this and a monostable holds its outputs a logic1 or 0 level
+to an input GPIO line.
+The modulation for the TV's IR heartbeat was set at approx 10kHz to try to avoid
+interfering with the 38kHz modulation frequency used by the MCE remote and the Samsung remote.
+See doc/irhb_10kHz_detector.pdf
+ 
 Tested with 16MHz crystal clock for ATmega328P - works with 38400baud, not v. reliable at 57600.
 Tested with 8MHz internal RC oscillator - works if baudrate dropped to 19200.
 May also work with F_CPU at 8MHz using the internal RC oscillator (NB untested as yet!)
